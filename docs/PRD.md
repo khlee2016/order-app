@@ -614,6 +614,263 @@ flowchart TD
 | 연동 항목 | 주문하기 → 관리자 |
 |-----------|-------------------|
 | 주문 생성 | 주문하기에서 **주문하기** 완료 시 관리자 **주문 현황**에 신규 주문 추가 |
-| 상품 목록 | 동일 3개 메뉴 (아메리카노 ICE/HOT, 카페라떼) 공유 |
+| 상품 목록 | 동일 메뉴·옵션 데이터를 API로 공유 |
 | 금액·옵션 표기 | 주문 내역 표시 규칙 동일 |
 | 대시보드 | 신규 주문 시 **총 주문**, **주문 접수** 증가 |
+| 재고 | 주문 시 메뉴 재고 차감, 관리자 화면에서 수동 조정 |
+
+---
+
+## 5. 백엔드 PRD
+
+### 5.1 목적
+프론트엔드(주문하기·관리자)와 PostgreSQL 데이터베이스를 연결하여 메뉴 조회, 주문 저장, 재고 관리, 주문 상태 변경을 API로 제공한다.
+
+### 5.2 기술 스택
+
+| 항목 | 기술 |
+|------|------|
+| 런타임 | Node.js |
+| 프레임워크 | Express.js |
+| 데이터베이스 | PostgreSQL |
+| 설정 | `.env` (서버 포트, DB 접속 정보) |
+
+### 5.3 데이터 모델
+
+#### Menus (메뉴)
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| id | string (PK) | 메뉴 식별자 |
+| name | string | 커피 이름 |
+| description | text | 메뉴 설명 |
+| price | integer | 기본 가격 (원) |
+| image_url | string (nullable) | 이미지 URL |
+| stock | integer | 재고 수량 |
+
+> 재고 수량(`stock`)은 **관리자 화면**에만 표시한다. 주문하기 API 응답에는 포함하지 않는다.
+
+#### Options (옵션)
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| id | string (PK) | 옵션 식별자 |
+| name | string | 옵션 이름 |
+| price | integer | 옵션 추가 가격 (원) |
+| menu_id | string (FK) | 연결할 메뉴 (`menus.id`) |
+
+#### Orders (주문)
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| id | integer (PK) | 주문 ID |
+| ordered_at | timestamptz | 주문 일시 |
+| status | string | 주문 상태 (`pending` / `preparing` / `completed`) |
+| total_amount | integer | 주문 총액 (원) |
+
+**주문 상태 매핑**
+
+| status | 화면 표시 | 설명 |
+|--------|-----------|------|
+| `pending` | 주문 접수 | 신규 주문 기본 상태 |
+| `preparing` | 제조 중 | 관리자가 제조를 시작한 상태 |
+| `completed` | 제조 완료 | 제조가 완료된 상태 |
+
+#### Order Items (주문 항목)
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| id | integer (PK) | 항목 ID |
+| order_id | integer (FK) | 주문 ID |
+| menu_id | string (FK) | 메뉴 ID |
+| menu_name | string | 주문 시점 메뉴명 |
+| quantity | integer | 수량 |
+| unit_price | integer | 단가 (기본가 + 옵션가) |
+| line_total | integer | 항목 합계 |
+
+#### Order Item Options (주문 항목 옵션)
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| order_item_id | integer (FK) | 주문 항목 ID |
+| option_id | string | 옵션 ID |
+| option_name | string | 옵션명 |
+
+---
+
+### 5.4 데이터 스키마 사용자 흐름
+
+```mermaid
+flowchart TD
+    A[① GET /api/menus] --> B[주문하기 화면에 메뉴·옵션 표시]
+    B --> C[② 사용자 메뉴 선택 → 장바구니]
+    C --> D[③ POST /api/orders]
+    D --> E[Orders 저장 + 재고 차감]
+    E --> F[④ GET /api/orders → 관리자 주문 현황]
+    F --> G{상태 변경}
+    G -->|제조 시작| H[pending → preparing]
+    G -->|제조 완료| I[preparing → completed]
+```
+
+**① 메뉴 조회**
+- `Menus`·`Options` 데이터를 API로 조회해 주문하기 화면에 표시한다.
+- `stock`은 주문하기 응답에서 제외하고, 관리자용 API에서만 제공한다.
+
+**② 장바구니**
+- 사용자가 메뉴·옵션을 선택하면 프론트엔드 장바구니에 담는다. (클라이언트 상태)
+
+**③ 주문 저장**
+- **주문하기** 클릭 시 `Orders`·`Order Items`·`Order Item Options`에 저장한다.
+- 주문 시간, 메뉴, 수량, 옵션, 금액을 포함한다.
+- 주문 수량만큼 해당 `Menus.stock`을 차감한다.
+
+**④ 관리자 주문 처리**
+- `Orders` 목록을 관리자 **주문 현황**에 표시한다.
+- 기본 상태는 **주문 접수**(`pending`).
+- **제조 시작** 클릭 → **제조 중**(`preparing`)
+- **제조 완료** 클릭 → **완료**(`completed`)
+- 완료된 주문은 목록에 유지하여 기록을 조회할 수 있다.
+
+---
+
+### 5.5 API 설계
+
+**Base URL:** `http://localhost:{PORT}/api`  
+**Content-Type:** `application/json`
+
+#### GET /api/menus
+주문하기 화면용 메뉴 목록을 반환한다. (재고 제외)
+
+**Response 200**
+```json
+{
+  "menus": [
+    {
+      "id": "americano-ice",
+      "name": "아메리카노(ICE)",
+      "description": "시원하고 깔끔한 아이스 아메리카노",
+      "price": 4000,
+      "imageUrl": null,
+      "options": [
+        { "id": "extra-shot", "name": "샷 추가", "price": 500 }
+      ]
+    }
+  ]
+}
+```
+
+#### GET /api/menus/admin
+관리자용 메뉴 목록을 반환한다. (`stock` 포함)
+
+**Response 200**
+```json
+{
+  "menus": [
+    {
+      "id": "americano-ice",
+      "name": "아메리카노(ICE)",
+      "stock": 10
+    }
+  ]
+}
+```
+
+#### PATCH /api/menus/:menuId/stock
+관리자가 재고를 수동 조정한다.
+
+**Request Body**
+```json
+{ "delta": 1 }
+```
+
+**Response 200**
+```json
+{ "id": "americano-ice", "stock": 11 }
+```
+
+#### POST /api/orders
+주문을 생성하고 재고를 차감한다.
+
+**Request Body**
+```json
+{
+  "items": [
+    {
+      "menuId": "americano-ice",
+      "quantity": 1,
+      "selectedOptionIds": ["extra-shot"]
+    }
+  ]
+}
+```
+
+**Response 201**
+```json
+{
+  "id": 1,
+  "orderedAt": "2026-06-07T12:00:00.000Z",
+  "status": "pending",
+  "totalAmount": 4500,
+  "items": [...]
+}
+```
+
+#### GET /api/orders
+관리자용 주문 목록을 반환한다. (최신순)
+
+#### GET /api/orders/:orderId
+주문 ID로 주문 상세를 반환한다.
+
+**Response 200** — 주문 객체 (항목·옵션 포함)
+
+**Response 404** — 주문 없음
+
+#### PATCH /api/orders/:orderId/status
+주문 상태를 변경한다.
+
+**Request Body**
+```json
+{ "status": "preparing" }
+```
+
+허용 전환: `pending` → `preparing` → `completed`
+
+---
+
+### 5.6 환경 변수 (.env)
+
+| 변수 | 설명 | 예시 |
+|------|------|------|
+| PORT | 서버 포트 | `3000` |
+| DATABASE_URL | PostgreSQL 접속 URL | `postgresql://user:pass@localhost:5432/cozy_order` |
+| NODE_ENV | 실행 환경 | `development` |
+
+---
+
+### 5.7 프로젝트 구조
+
+```
+order-app/
+├── server/
+│   ├── .env
+│   ├── .env.example
+│   ├── package.json
+│   └── src/
+│       ├── index.js
+│       ├── config.js
+│       ├── db/
+│       │   ├── pool.js
+│       │   ├── schema.sql
+│       │   └── seed.sql
+│       └── routes/
+│           ├── menus.js
+│           └── orders.js
+└── ui/
+```
+
+---
+
+### 5.8 수용 기준 (Acceptance Criteria)
+
+- [ ] `GET /api/menus`로 메뉴·옵션 목록을 조회할 수 있다.
+- [ ] `POST /api/orders`로 주문이 DB에 저장되고 재고가 차감된다.
+- [ ] `GET /api/orders/:id`로 주문 상세를 조회할 수 있다.
+- [ ] `GET /api/orders`로 관리자 화면에 주문 목록이 표시된다.
+- [ ] `PATCH /api/orders/:id/status`로 주문 상태가 변경된다.
+- [ ] `PATCH /api/menus/:id/stock`으로 재고를 조정할 수 있다.
+- [ ] 프론트엔드 주문하기·관리자 화면이 API와 연동된다.

@@ -1,5 +1,4 @@
 import { useState } from 'react'
-import { OPTIONS } from '../data/menu'
 import { formatPrice } from '../utils/format'
 import './ProductCard.css'
 
@@ -22,13 +21,17 @@ function ProductCard({ product, onAddToCart }) {
   return (
     <article className="product-card">
       <div className="product-image" aria-hidden="true">
-        <span className="product-image-placeholder">☕</span>
+        {product.imageUrl ? (
+          <img src={product.imageUrl} alt={product.name} />
+        ) : (
+          <span className="product-image-placeholder">☕</span>
+        )}
       </div>
       <h3 className="product-name">{product.name}</h3>
       <p className="product-price">{formatPrice(product.price)}</p>
       <p className="product-description">{product.description}</p>
       <div className="product-options">
-        {OPTIONS.map((option) => (
+        {(product.options || []).map((option) => (
           <label key={option.id} className="option-label">
             <input
               type="checkbox"
@@ -36,8 +39,8 @@ function ProductCard({ product, onAddToCart }) {
               onChange={() => toggleOption(option.id)}
             />
             <span>
-              {option.name} ({option.extraPrice > 0 ? '+' : ''}
-              {formatPrice(option.extraPrice)})
+              {option.name} ({option.price > 0 ? '+' : ''}
+              {formatPrice(option.price)})
             </span>
           </label>
         ))}

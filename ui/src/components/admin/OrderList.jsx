@@ -5,10 +5,12 @@ import {
   formatOrderItemLine,
   getSortedOrders,
   ORDER_STATUS,
+  STATUS_BUTTON_LABEL,
+  NEXT_STATUS,
 } from '../../utils/orders'
 import './OrderList.css'
 
-function OrderList({ orders, onStartPreparation }) {
+function OrderList({ orders, onUpdateStatus }) {
   const listRef = useRef(null)
   const sortedOrders = getSortedOrders(orders)
 
@@ -27,6 +29,9 @@ function OrderList({ orders, onStartPreparation }) {
         <ul ref={listRef} className="order-list">
           {sortedOrders.map((order) => {
             const isCompleted = order.status === ORDER_STATUS.COMPLETED
+            const nextStatus = NEXT_STATUS[order.status]
+            const buttonLabel =
+              STATUS_BUTTON_LABEL[order.status] || '완료'
 
             return (
               <li
@@ -52,9 +57,9 @@ function OrderList({ orders, onStartPreparation }) {
                     isCompleted ? 'btn-completed' : 'btn-primary'
                   }`}
                   disabled={isCompleted}
-                  onClick={() => onStartPreparation(order.id)}
+                  onClick={() => nextStatus && onUpdateStatus(order.id, nextStatus)}
                 >
-                  {isCompleted ? '완료' : '제조 시작'}
+                  {buttonLabel}
                 </button>
               </li>
             )

@@ -1,22 +1,20 @@
-import { OPTIONS } from '../data/menu'
-
 export function getCartKey(productId, selectedOptionIds) {
   const sorted = [...selectedOptionIds].sort()
   return `${productId}:${sorted.join(',')}`
 }
 
-export function calcUnitPrice(basePrice, selectedOptionIds) {
-  const extra = selectedOptionIds.reduce((sum, id) => {
-    const option = OPTIONS.find((o) => o.id === id)
-    return sum + (option?.extraPrice ?? 0)
-  }, 0)
-  return basePrice + extra
+export function getOptionLabels(product, selectedOptionIds) {
+  return selectedOptionIds
+    .map((id) => product.options?.find((o) => o.id === id)?.name)
+    .filter(Boolean)
 }
 
-export function getOptionLabels(selectedOptionIds) {
-  return selectedOptionIds
-    .map((id) => OPTIONS.find((o) => o.id === id)?.name)
-    .filter(Boolean)
+export function calcUnitPrice(product, selectedOptionIds) {
+  const extra = selectedOptionIds.reduce((sum, id) => {
+    const option = product.options?.find((o) => o.id === id)
+    return sum + (option?.price ?? 0)
+  }, 0)
+  return product.price + extra
 }
 
 export function formatCartItemLabel(productName, optionLabels) {
@@ -48,8 +46,8 @@ export function updateCartItemQuantity(cart, key, delta) {
 
 export function addToCart(cart, product, selectedOptionIds) {
   const key = getCartKey(product.id, selectedOptionIds)
-  const unitPrice = calcUnitPrice(product.price, selectedOptionIds)
-  const optionLabels = getOptionLabels(selectedOptionIds)
+  const unitPrice = calcUnitPrice(product, selectedOptionIds)
+  const optionLabels = getOptionLabels(product, selectedOptionIds)
 
   const existing = cart.find((item) => item.key === key)
   if (existing) {

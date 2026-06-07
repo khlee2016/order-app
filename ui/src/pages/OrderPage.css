@@ -8,3 +8,10 @@
   flex-wrap: wrap;
   gap: 1.25rem;
 }
+
+.page-loading {
+  margin: 0;
+  color: #64748b;
+  text-align: center;
+  padding: 3rem;
+}

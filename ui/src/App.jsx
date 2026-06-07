@@ -1,23 +1,67 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Header from './components/Header'
 import OrderPage from './pages/OrderPage'
 import AdminPage from './pages/AdminPage'
-import { addToCart, getCartTotal, updateCartItemQuantity } from './utils/cart'
-import { createInitialInventory, updateInventoryStock } from './utils/inventory'
-import { createOrder, startPreparation } from './utils/orders'
+import { fetchAdminMenus, fetchMenus, updateMenuStock } from './api/menus'
+import {
+  createOrder as createOrderApi,
+  fetchOrders,
+  updateOrderStatus,
+} from './api/orders'
+import { addToCart, updateCartItemQuantity } from './utils/cart'
 import './App.css'
 
 function App() {
   const [currentPage, setCurrentPage] = useState('order')
   const [cart, setCart] = useState([])
+  const [menus, setMenus] = useState([])
+  const [adminMenus, setAdminMenus] = useState([])
   const [orders, setOrders] = useState([])
-  const [inventory, setInventory] = useState(createInitialInventory)
+  const [loadingMenus, setLoadingMenus] = useState(true)
+  const [loadingAdmin, setLoadingAdmin] = useState(false)
   const [toast, setToast] = useState(null)
 
   function showToast(message) {
     setToast(message)
     setTimeout(() => setToast(null), 2500)
   }
+
+  const loadMenus = useCallback(async () => {
+    try {
+      const data = await fetchMenus()
+      setMenus(data.menus)
+    } catch (err) {
+      showToast(err.message)
+    } finally {
+      setLoadingMenus(false)
+    }
+  }, [])
+
+  const loadAdminData = useCallback(async () => {
+    setLoadingAdmin(true)
+    try {
+      const [menusData, ordersData] = await Promise.all([
+        fetchAdminMenus(),
+        fetchOrders(),
+      ])
+      setAdminMenus(menusData.menus)
+      setOrders(ordersData.orders)
+    } catch (err) {
+      showToast(err.message)
+    } finally {
+      setLoadingAdmin(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadMenus()
+  }, [loadMenus])
+
+  useEffect(() => {
+    if (currentPage === 'admin') {
+      loadAdminData()
+    }
+  }, [currentPage, loadAdminData])
 
   function handleAddToCart(product, selectedOptionIds) {
     setCart((prev) => addToCart(prev, product, selectedOptionIds))
@@ -27,30 +71,64 @@ function App() {
     setCart((prev) => updateCartItemQuantity(prev, key, delta))
   }
 
-  function handleOrder() {
+  async function handleOrder() {
     if (cart.length === 0) return
 
-    const totalAmount = getCartTotal(cart)
-    const newOrder = createOrder(cart, totalAmount)
-    setOrders((prev) => [newOrder, ...prev])
-    showToast('주문이 완료되었습니다!')
-    setCart([])
+    try {
+      const payload = cart.map((item) => ({
+        menuId: item.productId,
+        quantity: item.quantity,
+        selectedOptionIds: item.selectedOptionIds,
+      }))
+
+      await createOrderApi(payload)
+      showToast('주문이 완료되었습니다!')
+      setCart([])
+
+      if (currentPage === 'admin') {
+        await loadAdminData()
+      }
+    } catch (err) {
+      showToast(err.message)
+    }
   }
 
-  function handleUpdateStock(productId, delta) {
-    setInventory((prev) => updateInventoryStock(prev, productId, delta))
+  async function handleUpdateStock(menuId, delta) {
+    try {
+      const result = await updateMenuStock(menuId, delta)
+      setAdminMenus((prev) =>
+        prev.map((menu) =>
+          menu.id === menuId ? { ...menu, stock: result.stock } : menu,
+        ),
+      )
+    } catch (err) {
+      showToast(err.message)
+    }
   }
 
-  function handleStartPreparation(orderId) {
-    setOrders((prev) => startPreparation(prev, orderId))
+  async function handleUpdateStatus(orderId, status) {
+    try {
+      const updated = await updateOrderStatus(orderId, status)
+      setOrders((prev) =>
+        prev.map((order) => (order.id === orderId ? updated : order)),
+      )
+    } catch (err) {
+      showToast(err.message)
+    }
+  }
+
+  function handleNavigate(page) {
+    setCurrentPage(page)
   }
 
   return (
     <div className="app">
-      <Header currentPage={currentPage} onNavigate={setCurrentPage} />
+      <Header currentPage={currentPage} onNavigate={handleNavigate} />
       <main className="main">
         {currentPage === 'order' ? (
           <OrderPage
+            menus={menus}
+            loading={loadingMenus}
             cart={cart}
             onAddToCart={handleAddToCart}
             onUpdateQuantity={handleUpdateQuantity}
@@ -59,9 +137,10 @@ function App() {
         ) : (
           <AdminPage
             orders={orders}
-            inventory={inventory}
+            adminMenus={adminMenus}
+            loading={loadingAdmin}
             onUpdateStock={handleUpdateStock}
-            onStartPreparation={handleStartPreparation}
+            onUpdateStatus={handleUpdateStatus}
           />
         )}
       </main>

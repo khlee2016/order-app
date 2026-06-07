@@ -1,13 +1,16 @@
-import { PRODUCTS } from '../data/menu'
 import ProductCard from '../components/ProductCard'
 import Cart from '../components/Cart'
 import './OrderPage.css'
 
-function OrderPage({ cart, onAddToCart, onUpdateQuantity, onOrder }) {
+function OrderPage({ menus, loading, cart, onAddToCart, onUpdateQuantity, onOrder }) {
+  if (loading) {
+    return <p className="page-loading">메뉴를 불러오는 중...</p>
+  }
+
   return (
     <div className="order-page">
       <section className="product-list">
-        {PRODUCTS.map((product) => (
+        {menus.map((product) => (
           <ProductCard
             key={product.id}
             product={product}
