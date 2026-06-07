@@ -1,0 +1,79 @@
+.order-empty {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 0.95rem;
+}
+
+.order-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 400px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+}
+
+.order-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.order-item + .order-item {
+  margin-top: 0.75rem;
+}
+
+.order-item--completed {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  opacity: 0.85;
+}
+
+.order-item--completed .order-item-line,
+.order-item--completed .order-amount {
+  color: #64748b;
+}
+
+.order-info {
+  flex: 1;
+}
+
+.order-datetime {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
+.order-items {
+  margin-bottom: 0.25rem;
+}
+
+.order-item-line {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #334155;
+}
+
+.order-amount {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.order-action-btn {
+  flex-shrink: 0;
+  padding: 0.6rem 1.25rem;
+  white-space: nowrap;
+}
+
+.btn-completed {
+  background: #94a3b8;
+  color: #fff;
+  cursor: default;
+}

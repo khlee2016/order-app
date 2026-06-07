@@ -10,15 +10,6 @@
   padding: 2rem 1.5rem;
 }
 
-.admin-placeholder {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 300px;
-  color: #64748b;
-  font-size: 1.1rem;
-}
-
 .btn {
   border: none;
   border-radius: 6px;

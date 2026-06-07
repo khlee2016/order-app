@@ -1,12 +1,17 @@
 import { useState } from 'react'
 import Header from './components/Header'
 import OrderPage from './pages/OrderPage'
-import { addToCart, updateCartItemQuantity } from './utils/cart'
+import AdminPage from './pages/AdminPage'
+import { addToCart, getCartTotal, updateCartItemQuantity } from './utils/cart'
+import { createInitialInventory, updateInventoryStock } from './utils/inventory'
+import { createOrder, startPreparation } from './utils/orders'
 import './App.css'
 
 function App() {
   const [currentPage, setCurrentPage] = useState('order')
   const [cart, setCart] = useState([])
+  const [orders, setOrders] = useState([])
+  const [inventory, setInventory] = useState(createInitialInventory)
   const [toast, setToast] = useState(null)
 
   function showToast(message) {
@@ -24,8 +29,20 @@ function App() {
 
   function handleOrder() {
     if (cart.length === 0) return
+
+    const totalAmount = getCartTotal(cart)
+    const newOrder = createOrder(cart, totalAmount)
+    setOrders((prev) => [newOrder, ...prev])
     showToast('주문이 완료되었습니다!')
     setCart([])
+  }
+
+  function handleUpdateStock(productId, delta) {
+    setInventory((prev) => updateInventoryStock(prev, productId, delta))
+  }
+
+  function handleStartPreparation(orderId) {
+    setOrders((prev) => startPreparation(prev, orderId))
   }
 
   return (
@@ -40,9 +57,12 @@ function App() {
             onOrder={handleOrder}
           />
         ) : (
-          <div className="admin-placeholder">
-            <p>관리자 화면은 준비 중입니다.</p>
-          </div>
+          <AdminPage
+            orders={orders}
+            inventory={inventory}
+            onUpdateStock={handleUpdateStock}
+            onStartPreparation={handleStartPreparation}
+          />
         )}
       </main>
       {toast && <div className="toast">{toast}</div>}
