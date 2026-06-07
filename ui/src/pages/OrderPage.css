@@ -1,0 +1,10 @@
+.order-page {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.product-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+}
